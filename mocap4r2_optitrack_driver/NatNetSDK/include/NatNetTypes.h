@@ -1,23 +1,21 @@
-//=============================================================================----
-// Copyright © 2016 NaturalPoint, Inc. All Rights Reserved.
-// 
-// This software is provided by the copyright holders and contributors "as is" and
-// any express or implied warranties, including, but not limited to, the implied
-// warranties of merchantability and fitness for a particular purpose are disclaimed.
-// In no event shall NaturalPoint, Inc. or contributors be liable for any direct,
-// indirect, incidental, special, exemplary, or consequential damages
-// (including, but not limited to, procurement of substitute goods or services;
-// loss of use, data, or profits; or business interruption) however caused
-// and on any theory of liability, whether in contract, strict liability,
-// or tort (including negligence or otherwise) arising in any way out of
-// the use of this software, even if advised of the possibility of such damage.
-//=============================================================================----
+//=============================================================================
+// Copyright © 2025 NaturalPoint, Inc. All Rights Reserved.
+//
+// THIS SOFTWARE IS GOVERNED BY THE OPTITRACK PLUGINS EULA AVAILABLE AT https://www.optitrack.com/about/legal/eula.html
+// AND/OR FOR DOWNLOAD WITH THE APPLICABLE SOFTWARE FILE(S) (“PLUGINS EULA”). BY DOWNLOADING, INSTALLING, ACTIVATING
+// AND/OR OTHERWISE USING THE SOFTWARE, YOU ARE AGREEING THAT YOU HAVE READ, AND THAT YOU AGREE TO COMPLY WITH AND ARE
+//  BOUND BY, THE PLUGINS EULA AND ALL APPLICABLE LAWS AND REGULATIONS. IF YOU DO NOT AGREE TO BE BOUND BY THE PLUGINS
+//  EULA, THEN YOU MAY NOT DOWNLOAD, INSTALL, ACTIVATE OR OTHERWISE USE THE SOFTWARE AND YOU MUST PROMPTLY DELETE OR
+//  RETURN IT. IF YOU ARE DOWNLOADING, INSTALLING, ACTIVATING AND/OR OTHERWISE USING THE SOFTWARE ON BEHALF OF AN ENTITY,
+//  THEN BY DOING SO YOU REPRESENT AND WARRANT THAT YOU HAVE THE APPROPRIATE AUTHORITY TO ACCEPT THE PLUGINS EULA ON
+//  BEHALF OF SUCH ENTITY. See license file in root directory for additional governing terms and information.
+//=============================================================================
 
 /*
 NatNetTypes defines the public, common data structures and types
 used when working with NatNetServer and NatNetClient objects.
 
-version 3.0.0.0
+version 4.2.0.0
 */
 
 #pragma once
@@ -74,8 +72,9 @@ version 3.0.0.0
 
 // model limits
 #define MAX_MODELS                  2000    // maximum number of total models (data descriptions)
-#define MAX_MARKERSETS              1000    // maximum number of MarkerSets 
+#define MAX_MARKERSETS              1000    // maximum number of MarkerSets
 #define MAX_RIGIDBODIES             1000    // maximum number of RigidBodies
+#define MAX_ASSETS                  1000    // Maximum number of Assets
 #define MAX_NAMELENGTH              256     // maximum length for strings
 #define MAX_MARKERS                 200     // maximum number of markers per MarkerSet
 #define MAX_RBMARKERS               20      // maximum number of markers per RigidBody
@@ -84,8 +83,8 @@ version 3.0.0.0
 #define MAX_LABELED_MARKERS         1000    // maximum number of labeled markers per frame
 #define MAX_UNLABELED_MARKERS       1000    // maximum number of unlabeled (other) markers per frame
 
-#define MAX_FORCEPLATES             32      // maximum number of force plates
-#define MAX_DEVICES                 32      // maximum number of peripheral devices
+#define MAX_FORCEPLATES             100     // maximum number of force plate 'bundles'
+#define MAX_DEVICES                 100     // maximum number of peripheral device 'bundles'
 #define MAX_ANALOG_CHANNELS         32      // maximum number of data channels (signals) per analog/force plate device
 #define MAX_ANALOG_SUBFRAMES        30      // maximum number of analog/force plate frames per mocap frame
 
@@ -156,9 +155,15 @@ typedef enum DataDescriptors
     Descriptor_Skeleton,
     Descriptor_ForcePlate,
     Descriptor_Device,
-    Descriptor_Camera
+    Descriptor_Camera,
+    Descriptor_Asset
 } DataDescriptors;
 
+typedef enum AssetTypes
+{
+    AssetType_Undefined = 0,
+    AssetType_TrainedMarkerset = 1
+} AssetTypes;
 
 typedef float MarkerData[3];                // posX, posY, posZ
 
@@ -186,7 +191,7 @@ typedef struct sSender_Server
 
 
 // packet
-// Describes basic NatNet packet structure.  
+// Describes basic NatNet packet structure.
 // Only used publicly by clients who are depacketizing NatNet packets directly
 typedef struct sPacket
 {
@@ -228,7 +233,7 @@ typedef struct sServerDescription
     bool HostPresent;                       // host is present and accounted for
     char szHostComputerName[MAX_NAMELENGTH];// host computer name
     uint8_t HostComputerAddress[4];         // host IP address
-    char szHostApp[MAX_NAMELENGTH];         // name of host app 
+    char szHostApp[MAX_NAMELENGTH];         // name of host app
     uint8_t HostAppVersion[4];              // version of host app
     uint8_t NatNetVersion[4];               // host app's version of NatNet
 
@@ -241,13 +246,26 @@ typedef struct sServerDescription
     uint8_t ConnectionMulticastAddress[4];  // The multicast group address to use for a multicast connection.
 } sServerDescription;
 
+// Marker Description
+typedef struct sMarkerDescription
+{
+    char szName[MAX_NAMELENGTH];            // Marker Name
+    int32_t ID;                             // Unique ID
+    float x;                                // initial x position
+    float y;                                // initial y position
+    float z;                                // initial z position
+    float size;                             // Marker size
+    int16_t params;                         // Host defined parameters.  Bit values:
+                                                // 0 : Active
+
+} sMarkerDescription;
 
 // Marker
 typedef struct sMarker
 {
     int32_t ID;                             // Unique identifier:
-                                            // For active markers, this is the Active ID. For passive markers, this is the PointCloud assigned ID.
-                                            // For legacy assets that are created prior to 2.0, this is both AssetID (High-bit) and Member ID (Lo-bit)
+                                            // For active markers, this is the Active ID.
+                                            // For passive markers, this is the PointCloud assigned ID, which is both AssetID (High-bit) and Member ID (Lo-bit).
 
     float x;                                // x position
     float y;                                // y position
@@ -262,7 +280,7 @@ typedef struct sMarker
                                                 // 5 : Active
                                                 // 6 : Established
                                                 // 7 : Measurement
-    float residual;                         // marker error residual, in mm/ray
+    float residual;                         // marker error residual, in m/ray
 } sMarker;
 
 
@@ -291,6 +309,7 @@ typedef struct sRigidBodyDescription
     int32_t ID;                             // RigidBody identifier: Streaming ID value for rigid body assets, and Bone index value for skeleton rigid bodies.
     int32_t parentID;                       // ID of parent Rigid Body (in case hierarchy exists; otherwise -1)
     float offsetx, offsety, offsetz;        // offset position relative to parent
+    float offsetqx, offsetqy, offsetqz, offsetqw; // Quaternion rotational offset relative to parent for skeleton bones
     int32_t nMarkers;                       // Number of markers associated with this rigid body
     MarkerData* MarkerPositions;            // Array of marker locations ( [nMarkers][3] )
     int32_t* MarkerRequiredLabels;          // Array of expected marker active labels - 0 if not specified. ( [nMarkers] )
@@ -301,13 +320,13 @@ typedef struct sRigidBodyDescription
 // Rigid Body Data (single frame of one rigid body)
 typedef struct sRigidBodyData
 {
-    int32_t ID;                             // RigidBody identifier: 
-                                            // For rigid body assets, this is the Streaming ID value. 
+    int32_t ID;                             // RigidBody identifier:
+                                            // For rigid body assets, this is the Streaming ID value.
                                             // For skeleton assets, this combines both skeleton ID (High-bit) and Bone ID (Low-bit).
 
     float x, y, z;                          // Position
     float qx, qy, qz, qw;                   // Orientation
-    float MeanError;                        // Mean measure-to-solve deviation
+    float MeanError;                        // Mean measure-to-solve deviation (mean marker error) (meters)
     int16_t params;                         // Host defined tracking flags
 
 #if defined(__cplusplus)
@@ -329,7 +348,7 @@ typedef struct sSkeletonDescription
     char szName[MAX_NAMELENGTH];                            // Skeleton name
     int32_t skeletonID;                                     // Skeleton unqiue identifier
     int32_t nRigidBodies;                                   // # of rigid bodies (bones) in skeleton
-    sRigidBodyDescription RigidBodies[MAX_SKELRIGIDBODIES]; // array of rigid body (bone) descriptions 
+    sRigidBodyDescription RigidBodies[MAX_SKELRIGIDBODIES]; // array of rigid body (bone) descriptions
 } sSkeletonDescription;
 
 
@@ -341,7 +360,7 @@ typedef struct sSkeletonData
     sRigidBodyData* RigidBodyData;                          // Array of RigidBody data
 } sSkeletonData;
 
-// FrocePlate description
+// ForcePlate description
 typedef struct sForcePlateDescription
 {
     int32_t ID;                                     // used for order, and for identification in the data stream
@@ -351,7 +370,7 @@ typedef struct sForcePlateDescription
     float fOriginX, fOriginY, fOriginZ;             // electrical center offset (from electrical center to geometric center-top of force plate) (manufacturer supplied)
     float fCalMat[12][12];                          // force plate calibration matrix (for raw analog voltage channel type only)
     float fCorners[4][3];                           // plate corners, in world (aka Mocap System) coordinates, clockwise from plate +x,+y (refer to C3D spec for details)
-    int32_t iPlateType;                             // force plate 'type' (refer to C3D spec for details) 
+    int32_t iPlateType;                             // force plate 'type' (refer to C3D spec for details)
     int32_t iChannelDataType;                       // 0=Calibrated force data, 1=Raw analog voltages
     int32_t nChannels;                              // # of channels (signals)
     char szChannelNames[MAX_ANALOG_CHANNELS][MAX_NAMELENGTH];   // channel names
@@ -363,7 +382,7 @@ typedef struct sDeviceDescription
     int32_t ID;                                     // used for order, and for identification in the data stream
     char strName[128];                              // device name as appears in Motive
     char strSerialNo[128];                          // for unique device identification
-    int32_t iDeviceType;                            // device 'type' code 
+    int32_t iDeviceType;                            // device 'type' code
     int32_t iChannelDataType;                       // channel data type code
     int32_t nChannels;                              // # of currently enabled/active channels (signals)
     char szChannelNames[MAX_ANALOG_CHANNELS][MAX_NAMELENGTH];   // channel names
@@ -377,8 +396,35 @@ typedef struct sCameraDescription
     float qx, qy, qz, qw;                           // Orientation
 } sCameraDescription;
 
+// Asset description
+typedef struct sAssetDescription
+{
+    char szName[MAX_NAMELENGTH];                            // Name
+    int32_t AssetType;                                      // 1 : Trained MarkerSet
+    int32_t AssetID;                                        // User defined ID (correlates to sAssetData)
 
-// Tracked Object data description.  
+    int32_t nRigidBodies;                                   // # of rigid bodies in asset
+    sRigidBodyDescription RigidBodies[MAX_SKELRIGIDBODIES]; // Array of rigid body descriptions
+
+    int32_t nMarkers;                                        // # of markers in asset definition
+    sMarkerDescription Markers[MAX_MARKERS];                 // Array of marker descriptions
+
+} sAssetDescription;
+
+// Asset Data
+typedef struct sAssetData
+{
+    int32_t assetID;                                        // User defined ID (correlates to sAssetDescription )
+
+    int32_t nRigidBodies;                                   // # of rigid bodies
+    sRigidBodyData* RigidBodyData;                          // Array of RigidBody data
+
+    int32_t nMarkers;                                       // # of markers
+    sMarker* MarkerData;                                    // Array of marker data
+
+} sAssetData;
+
+// Tracked Object data description.
 // A Mocap Server application (e.g. Arena or TrackingTools) may contain multiple
 // tracked "objects (e.g. RigidBody, MarkerSet).  Each object will have its
 // own DataDescription.
@@ -393,6 +439,7 @@ typedef struct sDataDescription
         sForcePlateDescription* ForcePlateDescription;
         sDeviceDescription*     DeviceDescription;
         sCameraDescription*     CameraDescription;
+        sAssetDescription*      AssetDescription;
     } Data;
 } sDataDescription;
 
@@ -444,6 +491,9 @@ typedef struct sFrameOfMocapData
     int32_t nSkeletons;                             // # of Skeletons
     sSkeletonData Skeletons[MAX_SKELETONS];         // Skeleton data
 
+    int32_t nAssets;                                // # of Assets
+    sAssetData Assets[MAX_ASSETS];                  // Asset data
+
     int32_t nLabeledMarkers;                        // # of Labeled Markers
     sMarker LabeledMarkers[MAX_LABELED_MARKERS];    // Labeled Marker data (labeled markers not associated with a "MarkerSet")
 
@@ -459,7 +509,12 @@ typedef struct sFrameOfMocapData
     uint64_t CameraMidExposureTimestamp;            // Given in host's high resolution ticks (from e.g. QueryPerformanceCounter).
     uint64_t CameraDataReceivedTimestamp;           // Given in host's high resolution ticks (from e.g. QueryPerformanceCounter).
     uint64_t TransmitTimestamp;                     // Given in host's high resolution ticks (from e.g. QueryPerformanceCounter).
-    int16_t params;                                 // [b0:recording] [b1:model list changed] [b2: Live/Edit mode (0=Live, 1=Edit)]
+    uint32_t PrecisionTimestampSecs;                // External precision timestamp (if present, e.g. PTP).
+    uint32_t PrecisionTimestampFractionalSecs;      // External precision timestamp (if present, e.g. PTP).
+    int16_t params;                                 // [b0: recording]
+                                                    // [b1: model list changed]
+                                                    // [b2: Live/Edit mode (0=Live, 1=Edit)]
+                                                    // [b3: bitstream version changed]
 } sFrameOfMocapData;
 
 
