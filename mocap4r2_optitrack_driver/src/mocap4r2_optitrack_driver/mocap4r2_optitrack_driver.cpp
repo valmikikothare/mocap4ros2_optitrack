@@ -123,6 +123,8 @@ std::chrono::nanoseconds OptitrackDriverNode::get_optitrack_system_latency(sFram
 void
 OptitrackDriverNode::process_frame(sFrameOfMocapData * data)
 {
+  RCLCPP_INFO(get_logger(), "Processing frame");
+
   if (get_current_state().id() != lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
     return;
   }
@@ -133,7 +135,7 @@ OptitrackDriverNode::process_frame(sFrameOfMocapData * data)
   std::map<int, std::vector<mocap4r2_msgs::msg::Marker>> marker2rb;
 
   // Markers
-  if (mocap4r2_markers_pub_->get_subscription_count() > 0) {
+  if (true) {
     mocap4r2_msgs::msg::Markers msg;
     msg.header.stamp = now() - frame_delay;
     msg.header.frame_id = "map";
@@ -161,7 +163,7 @@ OptitrackDriverNode::process_frame(sFrameOfMocapData * data)
     mocap4r2_markers_pub_->publish(msg);
   }
 
-  if (mocap4r2_rigid_body_pub_->get_subscription_count() > 0) {
+  if (true) {
     mocap4r2_msgs::msg::RigidBodies msg_rb;
     msg_rb.header.stamp = now() - frame_delay;
     msg_rb.header.frame_id = "map";
@@ -288,12 +290,12 @@ OptitrackDriverNode::connect_optitrack()
     memset(&server_description, 0, sizeof(server_description));
     client->GetServerDescription(&server_description);
     if (!server_description.HostPresent) {
-      RCLCPP_DEBUG(get_logger(), "Unable to connect to server. Host not present.");
+      RCLCPP_INFO(get_logger(), "Unable to connect to server. Host not present.");
       return false;
     }
 
     if (client->GetDataDescriptionList(&data_descriptions) != ErrorCode_OK || !data_descriptions) {
-      RCLCPP_DEBUG(get_logger(), "[Client] Unable to retrieve Data Descriptions.\n");
+      RCLCPP_INFO(get_logger(), "[Client] Unable to retrieve Data Descriptions.\n");
     }
 
     RCLCPP_INFO(get_logger(), "\n[Client] Server application info:\n");
@@ -317,7 +319,7 @@ OptitrackDriverNode::connect_optitrack()
       float fRate = *(static_cast<float *>(pResult));
       RCLCPP_INFO(get_logger(), "Mocap Framerate : %3.2f\n", fRate);
     } else {
-      RCLCPP_DEBUG(get_logger(), "Error getting frame rate.\n");
+      RCLCPP_INFO(get_logger(), "Error getting frame rate.\n");
     }
   } else {
     RCLCPP_INFO(get_logger(), "... not connected :( ");
