@@ -37,6 +37,7 @@ OptitrackDriverNode::OptitrackDriverNode()
   declare_parameter<std::string>("multicast_address", "000.000.000.000");
   declare_parameter<uint16_t>("server_command_port", 0);
   declare_parameter<uint16_t>("server_data_port", 0);
+  declare_parameter<double>("large_latency_threshold", 0.005);
 
   client = new NatNetClient();
   client->SetFrameReceivedCallback(process_frame_callback, this);
@@ -79,31 +80,41 @@ void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data,
 }
 
 std::chrono::nanoseconds
-OptitrackDriverNode::get_optitrack_system_latency(sFrameOfMocapData* data) {
-  const bool bSystemLatencyAvailable = data->CameraMidExposureTimestamp != 0;
-
-  if (bSystemLatencyAvailable) {
-    const double clientLatencySec =
-        client->SecondsSinceHostTimestamp(data->CameraMidExposureTimestamp);
-    const double clientLatencyMillisec = clientLatencySec * 1000.0;
-    const double transitLatencyMillisec =
-        client->SecondsSinceHostTimestamp(data->TransmitTimestamp) * 1000.0;
-
-    const double largeLatencyThreshold = 100.0;
-    if (clientLatencyMillisec >= largeLatencyThreshold) {
-      RCLCPP_WARN_THROTTLE(get_logger(), *this->get_clock(), 500,
-                           "Optitrack system latency >%.0f ms: [Transmission: "
-                           "%.0fms, Total: %.0fms]",
-                           largeLatencyThreshold, transitLatencyMillisec,
-                           clientLatencyMillisec);
-    }
-
-    return std::chrono::round<std::chrono::nanoseconds>(
-        std::chrono::duration<float>{clientLatencySec});
+OptitrackDriverNode::get_optitrack_latency(sFrameOfMocapData* data) {
+  uint64_t host_timestamp;
+  if (data->CameraMidExposureTimestamp != 0) {
+    host_timestamp = data->CameraMidExposureTimestamp;
+  } else if (data->CameraDataReceivedTimestamp != 0) {
+    RCLCPP_WARN_ONCE(
+        get_logger(),
+        "Optitrack system latency not available, using software latency");
+    host_timestamp = data->CameraDataReceivedTimestamp;
   } else {
-    RCLCPP_WARN_ONCE(get_logger(), "Optitrack's system latency not available");
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
+                         "Optitrack latency not available");
     return std::chrono::nanoseconds::zero();
   }
+
+  const double clientLatency =
+      client->SecondsSinceHostTimestamp(host_timestamp);
+  const double transitLatency =
+      client->SecondsSinceHostTimestamp(data->TransmitTimestamp);
+
+  if (clientLatency >= large_latency_threshold_) {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500,
+                         "Optitrack latency >%.1f ms: [Transmission: "
+                         "%.1fms, Total: %.1fms]",
+                         large_latency_threshold_, transitLatency * 1000.0,
+                         clientLatency * 1000.0);
+  } else {
+    RCLCPP_INFO_THROTTLE(
+        get_logger(), *get_clock(), 10000,
+        "Optitrack latency: [Transmission: %.1fms, Total: %.1fms]",
+        transitLatency * 1000.0, clientLatency * 1000.0);
+  }
+
+  return std::chrono::round<std::chrono::nanoseconds>(
+      std::chrono::duration<float>{clientLatency});
 }
 
 void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
@@ -113,16 +124,18 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
   }
 
   frame_number_++;
-  rclcpp::Duration frame_delay =
-      rclcpp::Duration(get_optitrack_system_latency(data));
+  rclcpp::Duration frame_delay = rclcpp::Duration(get_optitrack_latency(data));
 
   std::map<int, std::vector<mocap4r2_msgs::msg::Marker>> marker2rb;
 
   // Markers
   if (mocap4r2_markers_pub_->get_subscription_count() > 0) {
     mocap4r2_msgs::msg::Markers msg;
-    msg.header.stamp = now() - frame_delay;
+    msg.header_original.stamp = now();
+    msg.header_original.frame_id = "map";
+    msg.header.stamp = msg.header_original.stamp - frame_delay;
     msg.header.frame_id = "map";
+
     msg.frame_number = frame_number_;
 
     for (int i = 0; i < data->nLabeledMarkers; i++) {
@@ -149,7 +162,9 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
 
   if (mocap4r2_rigid_body_pub_->get_subscription_count() > 0) {
     mocap4r2_msgs::msg::RigidBodies msg_rb;
-    msg_rb.header.stamp = now() - frame_delay;
+    msg_rb.header_original.stamp = now();
+    msg_rb.header_original.frame_id = "map";
+    msg_rb.header.stamp = msg_rb.header_original.stamp - frame_delay;
     msg_rb.header.frame_id = "map";
     msg_rb.frame_number = frame_number_;
 
@@ -183,12 +198,14 @@ OptitrackDriverNode::on_configure(const rclcpp_lifecycle::State& state) {
   (void) state;
   initParameters();
 
+  if (!connect_optitrack()) {
+    return CallbackReturnT::FAILURE;
+  }
+
   mocap4r2_markers_pub_ = create_publisher<mocap4r2_msgs::msg::Markers>(
       "markers", rclcpp::QoS(1000));
   mocap4r2_rigid_body_pub_ = create_publisher<mocap4r2_msgs::msg::RigidBodies>(
       "rigid_bodies", rclcpp::QoS(1000));
-
-  connect_optitrack();
 
   RCLCPP_INFO(get_logger(), "Configured!\n");
 
@@ -274,6 +291,7 @@ bool OptitrackDriverNode::connect_optitrack() {
         !data_descriptions) {
       RCLCPP_INFO(get_logger(),
                   "[Client] Unable to retrieve Data Descriptions.\n");
+      return false;
     }
 
     RCLCPP_INFO(get_logger(), "\n[Client] Server application info:\n");
@@ -332,6 +350,7 @@ void OptitrackDriverNode::initParameters() {
   get_parameter<std::string>("multicast_address", multicast_address_);
   get_parameter<uint16_t>("server_command_port", server_command_port_);
   get_parameter<uint16_t>("server_data_port", server_data_port_);
+  get_parameter<double>("large_latency_threshold", large_latency_threshold_);
 }
 
 } // namespace mocap4r2_optitrack_driver

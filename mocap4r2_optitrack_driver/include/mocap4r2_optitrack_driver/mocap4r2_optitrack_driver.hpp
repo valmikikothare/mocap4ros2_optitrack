@@ -64,8 +64,7 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
 
   NatNetClient* client;
 
-  std::chrono::nanoseconds
-  get_optitrack_system_latency(sFrameOfMocapData* data);
+  std::chrono::nanoseconds get_optitrack_latency(sFrameOfMocapData* data);
 
   sNatNetClientConnectParams client_params;
   sServerDescription server_description;
@@ -84,6 +83,7 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
   std::string multicast_address_;
   uint16_t server_command_port_;
   uint16_t server_data_port_;
+  double large_latency_threshold_;
 
   uint32_t frame_number_{0};
 };
