@@ -35,11 +35,14 @@ OptitrackDriverNode::OptitrackDriverNode()
   declare_parameter<std::string>("server_address", "000.000.000.000");
   declare_parameter<std::string>("local_address", "000.000.000.000");
   declare_parameter<std::string>("multicast_address", "000.000.000.000");
+  declare_parameter<std::string>("frame_id", "optitrack");
   declare_parameter<uint16_t>("server_command_port", 0);
   declare_parameter<uint16_t>("server_data_port", 0);
   declare_parameter<double>("large_latency_threshold", 0.005);
+  declare_parameter<std::string>("marker_topic", "markers");
+  declare_parameter<std::string>("rb_topic", "rigid_bodies");
 
-  client = new NatNetClient();
+  client = std::make_unique<NatNetClient>();
   client->SetFrameReceivedCallback(process_frame_callback, this);
 }
 
@@ -132,9 +135,9 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
   if (mocap4r2_markers_pub_->get_subscription_count() > 0) {
     mocap4r2_msgs::msg::Markers msg;
     msg.header_original.stamp = now();
-    msg.header_original.frame_id = "map";
+    msg.header_original.frame_id = frame_id_;
     msg.header.stamp = msg.header_original.stamp - frame_delay;
-    msg.header.frame_id = "map";
+    msg.header.frame_id = frame_id_;
 
     msg.frame_number = frame_number_;
 
@@ -163,9 +166,9 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
   if (mocap4r2_rigid_body_pub_->get_subscription_count() > 0) {
     mocap4r2_msgs::msg::RigidBodies msg_rb;
     msg_rb.header_original.stamp = now();
-    msg_rb.header_original.frame_id = "map";
+    msg_rb.header_original.frame_id = frame_id_;
     msg_rb.header.stamp = msg_rb.header_original.stamp - frame_delay;
-    msg_rb.header.frame_id = "map";
+    msg_rb.header.frame_id = frame_id_;
     msg_rb.frame_number = frame_number_;
 
     for (int i = 0; i < data->nRigidBodies; i++) {
@@ -203,9 +206,9 @@ OptitrackDriverNode::on_configure(const rclcpp_lifecycle::State& state) {
   }
 
   mocap4r2_markers_pub_ = create_publisher<mocap4r2_msgs::msg::Markers>(
-      "markers", rclcpp::QoS(1000));
+      marker_topic_, rclcpp::QoS(1000));
   mocap4r2_rigid_body_pub_ = create_publisher<mocap4r2_msgs::msg::RigidBodies>(
-      "rigid_bodies", rclcpp::QoS(1000));
+      rb_topic_, rclcpp::QoS(1000));
 
   RCLCPP_INFO(get_logger(), "Configured!\n");
 
@@ -351,6 +354,9 @@ void OptitrackDriverNode::initParameters() {
   get_parameter<uint16_t>("server_command_port", server_command_port_);
   get_parameter<uint16_t>("server_data_port", server_data_port_);
   get_parameter<double>("large_latency_threshold", large_latency_threshold_);
+  get_parameter<std::string>("frame_id", frame_id_);
+  get_parameter<std::string>("marker_topic", marker_topic_);
+  get_parameter<std::string>("rb_topic", rb_topic_);
 }
 
 } // namespace mocap4r2_optitrack_driver

@@ -26,6 +26,7 @@
 #include <NatNetTypes.h>
 
 #include <chrono>
+#include <memory>
 #include <string>
 
 #include "mocap4r2_control/ControlledLifecycleNode.hpp"
@@ -62,7 +63,7 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
   void control_stop(
       const mocap4r2_control_msgs::msg::Control::SharedPtr msg) override;
 
-  NatNetClient* client;
+  std::unique_ptr<NatNetClient> client;
 
   std::chrono::nanoseconds get_optitrack_latency(sFrameOfMocapData* data);
 
@@ -81,6 +82,9 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
   std::string server_address_;
   std::string local_address_;
   std::string multicast_address_;
+  std::string frame_id_;
+  std::string marker_topic_;
+  std::string rb_topic_;
   uint16_t server_command_port_;
   uint16_t server_data_port_;
   double large_latency_threshold_;
