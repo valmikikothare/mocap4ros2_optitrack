@@ -33,15 +33,16 @@
 #include "mocap4r2_msgs/msg/markers.hpp"
 #include "mocap4r2_msgs/msg/rigid_bodies.hpp"
 
-namespace mocap4r2_optitrack_driver {
+namespace mocap4r2_optitrack_driver
+{
 
-class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
- public:
+class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode
+{
+public:
   OptitrackDriverNode();
   ~OptitrackDriverNode();
 
-  using CallbackReturnT =
-      rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+  using CallbackReturnT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
   CallbackReturnT on_configure(const rclcpp_lifecycle::State& state) override;
   CallbackReturnT on_activate(const rclcpp_lifecycle::State& state) override;
@@ -57,11 +58,9 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
 
   void process_frame(sFrameOfMocapData* data);
 
- protected:
-  void control_start(
-      const mocap4r2_control_msgs::msg::Control::SharedPtr msg) override;
-  void control_stop(
-      const mocap4r2_control_msgs::msg::Control::SharedPtr msg) override;
+protected:
+  void control_start(const mocap4r2_control_msgs::msg::Control::SharedPtr msg) override;
+  void control_stop(const mocap4r2_control_msgs::msg::Control::SharedPtr msg) override;
 
   std::unique_ptr<NatNetClient> client;
 
@@ -69,14 +68,12 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
 
   sNatNetClientConnectParams client_params;
   sServerDescription server_description;
-  sDataDescriptions* data_descriptions{nullptr};
+  sDataDescriptions* data_descriptions{ nullptr };
   sFrameOfMocapData latest_data;
   sRigidBodyData latest_body_frame_data;
 
-  rclcpp_lifecycle::LifecyclePublisher<mocap4r2_msgs::msg::Markers>::SharedPtr
-      mocap4r2_markers_pub_;
-  rclcpp_lifecycle::LifecyclePublisher<
-      mocap4r2_msgs::msg::RigidBodies>::SharedPtr mocap4r2_rigid_body_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<mocap4r2_msgs::msg::Markers>::SharedPtr mocap4r2_markers_pub_;
+  rclcpp_lifecycle::LifecyclePublisher<mocap4r2_msgs::msg::RigidBodies>::SharedPtr mocap4r2_rigid_body_pub_;
 
   std::string connection_type_;
   std::string server_address_;
@@ -89,12 +86,11 @@ class OptitrackDriverNode : public mocap4r2_control::ControlledLifecycleNode {
   uint16_t server_data_port_;
   double large_latency_threshold_;
 
-  uint32_t frame_number_{0};
+  uint32_t frame_number_{ 0 };
 };
 
-void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data,
-                                            void* pUserData);
+void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data, void* pUserData);
 
-} // namespace mocap4r2_optitrack_driver
+}  // namespace mocap4r2_optitrack_driver
 
-#endif // MOCAP4R2_OPTITRACK_DRIVER__MOCAP4R2_OPTITRACK_DRIVER_HPP_
+#endif  // MOCAP4R2_OPTITRACK_DRIVER__MOCAP4R2_OPTITRACK_DRIVER_HPP_

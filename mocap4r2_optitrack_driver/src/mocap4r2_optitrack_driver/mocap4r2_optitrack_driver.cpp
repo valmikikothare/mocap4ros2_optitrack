@@ -27,10 +27,11 @@
 #include "mocap4r2_msgs/msg/marker.hpp"
 #include "mocap4r2_msgs/msg/markers.hpp"
 
-namespace mocap4r2_optitrack_driver {
+namespace mocap4r2_optitrack_driver
+{
 
-OptitrackDriverNode::OptitrackDriverNode()
-    : ControlledLifecycleNode("mocap4r2_optitrack_driver_node") {
+OptitrackDriverNode::OptitrackDriverNode() : ControlledLifecycleNode("mocap4r2_optitrack_driver_node")
+{
   declare_parameter<std::string>("connection_type", "Unicast");
   declare_parameter<std::string>("server_address", "000.000.000.000");
   declare_parameter<std::string>("local_address", "000.000.000.000");
@@ -46,18 +47,24 @@ OptitrackDriverNode::OptitrackDriverNode()
   client->SetFrameReceivedCallback(process_frame_callback, this);
 }
 
-OptitrackDriverNode::~OptitrackDriverNode() {
+OptitrackDriverNode::~OptitrackDriverNode()
+{
 }
 
-void OptitrackDriverNode::set_settings_optitrack() {
-  if (connection_type_ == "Multicast") {
+void OptitrackDriverNode::set_settings_optitrack()
+{
+  if (connection_type_ == "Multicast")
+  {
     client_params.connectionType = ConnectionType::ConnectionType_Multicast;
     client_params.multicastAddress = multicast_address_.c_str();
-  } else if (connection_type_ == "Unicast") {
+  }
+  else if (connection_type_ == "Unicast")
+  {
     client_params.connectionType = ConnectionType::ConnectionType_Unicast;
-  } else {
-    RCLCPP_FATAL(get_logger(),
-                 "Unknown connection type -- options are Multicast, Unicast");
+  }
+  else
+  {
+    RCLCPP_FATAL(get_logger(), "Unknown connection type -- options are Multicast, Unicast");
     rclcpp::shutdown();
   }
 
@@ -67,62 +74,62 @@ void OptitrackDriverNode::set_settings_optitrack() {
   client_params.serverDataPort = server_data_port_;
 }
 
-void OptitrackDriverNode::control_start(
-    const mocap4r2_control_msgs::msg::Control::SharedPtr msg) {
-  (void) msg;
+void OptitrackDriverNode::control_start(const mocap4r2_control_msgs::msg::Control::SharedPtr msg)
+{
+  (void)msg;
 }
 
-void OptitrackDriverNode::control_stop(
-    const mocap4r2_control_msgs::msg::Control::SharedPtr msg) {
-  (void) msg;
+void OptitrackDriverNode::control_stop(const mocap4r2_control_msgs::msg::Control::SharedPtr msg)
+{
+  (void)msg;
 }
 
-void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data,
-                                            void* pUserData) {
+void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data, void* pUserData)
+{
   static_cast<OptitrackDriverNode*>(pUserData)->process_frame(data);
 }
 
-std::chrono::nanoseconds
-OptitrackDriverNode::get_optitrack_latency(sFrameOfMocapData* data) {
+std::chrono::nanoseconds OptitrackDriverNode::get_optitrack_latency(sFrameOfMocapData* data)
+{
   uint64_t host_timestamp;
-  if (data->CameraMidExposureTimestamp != 0) {
+  if (data->CameraMidExposureTimestamp != 0)
+  {
     host_timestamp = data->CameraMidExposureTimestamp;
-  } else if (data->CameraDataReceivedTimestamp != 0) {
-    RCLCPP_WARN_ONCE(
-        get_logger(),
-        "Optitrack system latency not available, using software latency");
+  }
+  else if (data->CameraDataReceivedTimestamp != 0)
+  {
+    RCLCPP_WARN_ONCE(get_logger(), "Optitrack system latency not available, using software latency");
     host_timestamp = data->CameraDataReceivedTimestamp;
-  } else {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000,
-                         "Optitrack latency not available");
+  }
+  else
+  {
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 5000, "Optitrack latency not available");
     return std::chrono::nanoseconds::zero();
   }
 
-  const double clientLatency =
-      client->SecondsSinceHostTimestamp(host_timestamp);
-  const double transitLatency =
-      client->SecondsSinceHostTimestamp(data->TransmitTimestamp);
+  const double clientLatency = client->SecondsSinceHostTimestamp(host_timestamp);
+  const double transitLatency = client->SecondsSinceHostTimestamp(data->TransmitTimestamp);
 
-  if (clientLatency >= large_latency_threshold_) {
+  if (clientLatency >= large_latency_threshold_)
+  {
     RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500,
                          "Optitrack latency >%.1f ms: [Transmission: "
                          "%.1fms, Total: %.1fms]",
-                         large_latency_threshold_, transitLatency * 1000.0,
-                         clientLatency * 1000.0);
-  } else {
-    RCLCPP_INFO_THROTTLE(
-        get_logger(), *get_clock(), 10000,
-        "Optitrack latency: [Transmission: %.1fms, Total: %.1fms]",
-        transitLatency * 1000.0, clientLatency * 1000.0);
+                         large_latency_threshold_, transitLatency * 1000.0, clientLatency * 1000.0);
+  }
+  else
+  {
+    RCLCPP_INFO_THROTTLE(get_logger(), *get_clock(), 10000, "Optitrack latency: [Transmission: %.1fms, Total: %.1fms]",
+                         transitLatency * 1000.0, clientLatency * 1000.0);
   }
 
-  return std::chrono::round<std::chrono::nanoseconds>(
-      std::chrono::duration<float>{clientLatency});
+  return std::chrono::round<std::chrono::nanoseconds>(std::chrono::duration<float>{ clientLatency });
 }
 
-void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
-  if (get_current_state().id() !=
-      lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE) {
+void OptitrackDriverNode::process_frame(sFrameOfMocapData* data)
+{
+  if (get_current_state().id() != lifecycle_msgs::msg::State::PRIMARY_STATE_ACTIVE)
+  {
     return;
   }
 
@@ -132,7 +139,8 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
   std::map<int, std::vector<mocap4r2_msgs::msg::Marker>> marker2rb;
 
   // Markers
-  if (mocap4r2_markers_pub_->get_subscription_count() > 0) {
+  if (mocap4r2_markers_pub_->get_subscription_count() > 0)
+  {
     mocap4r2_msgs::msg::Markers msg;
     msg.header_original.stamp = now();
     msg.header_original.frame_id = frame_id_;
@@ -141,7 +149,8 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
 
     msg.frame_number = frame_number_;
 
-    for (int i = 0; i < data->nLabeledMarkers; i++) {
+    for (int i = 0; i < data->nLabeledMarkers; i++)
+    {
       bool Unlabeled = ((data->LabeledMarkers[i].params & 0x10) != 0);
       bool ActiveMarker = ((data->LabeledMarkers[i].params & 0x20) != 0);
       sMarker& marker_data = data->LabeledMarkers[i];
@@ -154,16 +163,20 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
       marker.translation.x = marker_data.x;
       marker.translation.y = marker_data.y;
       marker.translation.z = marker_data.z;
-      if (ActiveMarker || Unlabeled) {
+      if (ActiveMarker || Unlabeled)
+      {
         msg.markers.push_back(marker);
-      } else {
+      }
+      else
+      {
         marker2rb[modelID].push_back(marker);
       }
     }
     mocap4r2_markers_pub_->publish(msg);
   }
 
-  if (mocap4r2_rigid_body_pub_->get_subscription_count() > 0) {
+  if (mocap4r2_rigid_body_pub_->get_subscription_count() > 0)
+  {
     mocap4r2_msgs::msg::RigidBodies msg_rb;
     msg_rb.header_original.stamp = now();
     msg_rb.header_original.frame_id = frame_id_;
@@ -171,7 +184,8 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
     msg_rb.header.frame_id = frame_id_;
     msg_rb.frame_number = frame_number_;
 
-    for (int i = 0; i < data->nRigidBodies; i++) {
+    for (int i = 0; i < data->nRigidBodies; i++)
+    {
       mocap4r2_msgs::msg::RigidBody rb;
 
       rb.rigid_body_name = std::to_string(data->RigidBodies[i].ID);
@@ -191,33 +205,31 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data) {
   }
 }
 
-using CallbackReturnT =
-    rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
+using CallbackReturnT = rclcpp_lifecycle::node_interfaces::LifecycleNodeInterface::CallbackReturn;
 
 // The next Callbacks are used to manage behavior in the different states of the
 // lifecycle node.
-CallbackReturnT
-OptitrackDriverNode::on_configure(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_configure(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   initParameters();
 
-  if (!connect_optitrack()) {
+  if (!connect_optitrack())
+  {
     return CallbackReturnT::FAILURE;
   }
 
-  mocap4r2_markers_pub_ = create_publisher<mocap4r2_msgs::msg::Markers>(
-      marker_topic_, rclcpp::QoS(1000));
-  mocap4r2_rigid_body_pub_ = create_publisher<mocap4r2_msgs::msg::RigidBodies>(
-      rb_topic_, rclcpp::QoS(1000));
+  mocap4r2_markers_pub_ = create_publisher<mocap4r2_msgs::msg::Markers>(marker_topic_, rclcpp::QoS(1000));
+  mocap4r2_rigid_body_pub_ = create_publisher<mocap4r2_msgs::msg::RigidBodies>(rb_topic_, rclcpp::QoS(1000));
 
   RCLCPP_INFO(get_logger(), "Configured!\n");
 
   return ControlledLifecycleNode::on_configure(state);
 }
 
-CallbackReturnT
-OptitrackDriverNode::on_activate(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_activate(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   mocap4r2_markers_pub_->on_activate();
   mocap4r2_rigid_body_pub_->on_activate();
   RCLCPP_INFO(get_logger(), "Activated!\n");
@@ -225,9 +237,9 @@ OptitrackDriverNode::on_activate(const rclcpp_lifecycle::State& state) {
   return ControlledLifecycleNode::on_activate(state);
 }
 
-CallbackReturnT
-OptitrackDriverNode::on_deactivate(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_deactivate(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   mocap4r2_markers_pub_->on_deactivate();
   mocap4r2_rigid_body_pub_->on_deactivate();
   RCLCPP_INFO(get_logger(), "Deactivated!\n");
@@ -235,96 +247,98 @@ OptitrackDriverNode::on_deactivate(const rclcpp_lifecycle::State& state) {
   return ControlledLifecycleNode::on_deactivate(state);
 }
 
-CallbackReturnT
-OptitrackDriverNode::on_cleanup(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_cleanup(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   RCLCPP_INFO(get_logger(), "Cleaned up!\n");
 
-  if (disconnect_optitrack()) {
+  if (disconnect_optitrack())
+  {
     return ControlledLifecycleNode::on_cleanup(state);
-  } else {
+  }
+  else
+  {
     return CallbackReturnT::FAILURE;
   }
 }
 
-CallbackReturnT
-OptitrackDriverNode::on_shutdown(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_shutdown(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   RCLCPP_INFO(get_logger(), "Shutted down!\n");
 
-  if (disconnect_optitrack()) {
+  if (disconnect_optitrack())
+  {
     return ControlledLifecycleNode::on_shutdown(state);
-  } else {
+  }
+  else
+  {
     return CallbackReturnT::FAILURE;
   }
 }
 
-CallbackReturnT
-OptitrackDriverNode::on_error(const rclcpp_lifecycle::State& state) {
-  (void) state;
+CallbackReturnT OptitrackDriverNode::on_error(const rclcpp_lifecycle::State& state)
+{
+  (void)state;
   RCLCPP_INFO(get_logger(), "State id [%d]", get_current_state().id());
-  RCLCPP_INFO(get_logger(), "State label [%s]",
-              get_current_state().label().c_str());
+  RCLCPP_INFO(get_logger(), "State label [%s]", get_current_state().label().c_str());
 
   disconnect_optitrack();
 
   return ControlledLifecycleNode::on_error(state);
 }
 
-bool OptitrackDriverNode::connect_optitrack() {
-  RCLCPP_INFO(get_logger(),
-              "Trying to connect to Optitrack NatNET SDK at %s ...",
-              server_address_.c_str());
+bool OptitrackDriverNode::connect_optitrack()
+{
+  RCLCPP_INFO(get_logger(), "Trying to connect to Optitrack NatNET SDK at %s ...", server_address_.c_str());
 
   client->Disconnect();
   set_settings_optitrack();
 
-  if (client->Connect(client_params) == ErrorCode::ErrorCode_OK) {
+  if (client->Connect(client_params) == ErrorCode::ErrorCode_OK)
+  {
     RCLCPP_INFO(get_logger(), "... connected!");
 
     memset(&server_description, 0, sizeof(server_description));
     client->GetServerDescription(&server_description);
-    if (!server_description.HostPresent) {
-      RCLCPP_INFO(get_logger(),
-                  "Unable to connect to server. Host not present.");
+    if (!server_description.HostPresent)
+    {
+      RCLCPP_INFO(get_logger(), "Unable to connect to server. Host not present.");
       return false;
     }
 
-    if (client->GetDataDescriptionList(&data_descriptions) != ErrorCode_OK ||
-        !data_descriptions) {
-      RCLCPP_INFO(get_logger(),
-                  "[Client] Unable to retrieve Data Descriptions.\n");
+    if (client->GetDataDescriptionList(&data_descriptions) != ErrorCode_OK || !data_descriptions)
+    {
+      RCLCPP_INFO(get_logger(), "[Client] Unable to retrieve Data Descriptions.\n");
       return false;
     }
 
     RCLCPP_INFO(get_logger(), "\n[Client] Server application info:\n");
-    RCLCPP_INFO(get_logger(), "Application: %s (ver. %d.%d.%d.%d)\n",
-                server_description.szHostApp,
-                server_description.HostAppVersion[0],
-                server_description.HostAppVersion[1],
-                server_description.HostAppVersion[2],
-                server_description.HostAppVersion[3]);
-    RCLCPP_INFO(get_logger(), "NatNet Version: %d.%d.%d.%d\n",
-                server_description.NatNetVersion[0],
-                server_description.NatNetVersion[1],
-                server_description.NatNetVersion[2],
+    RCLCPP_INFO(get_logger(), "Application: %s (ver. %d.%d.%d.%d)\n", server_description.szHostApp,
+                server_description.HostAppVersion[0], server_description.HostAppVersion[1],
+                server_description.HostAppVersion[2], server_description.HostAppVersion[3]);
+    RCLCPP_INFO(get_logger(), "NatNet Version: %d.%d.%d.%d\n", server_description.NatNetVersion[0],
+                server_description.NatNetVersion[1], server_description.NatNetVersion[2],
                 server_description.NatNetVersion[3]);
     RCLCPP_INFO(get_logger(), "Client IP:%s\n", client_params.localAddress);
     RCLCPP_INFO(get_logger(), "Server IP:%s\n", client_params.serverAddress);
-    RCLCPP_INFO(get_logger(), "Server Name:%s\n",
-                server_description.szHostComputerName);
+    RCLCPP_INFO(get_logger(), "Server Name:%s\n", server_description.szHostComputerName);
 
     void* pResult;
     int nBytes = 0;
 
-    if (client->SendMessageAndWait("FrameRate", &pResult, &nBytes) ==
-        ErrorCode_OK) {
+    if (client->SendMessageAndWait("FrameRate", &pResult, &nBytes) == ErrorCode_OK)
+    {
       float fRate = *(static_cast<float*>(pResult));
       RCLCPP_INFO(get_logger(), "Mocap Framerate : %3.2f\n", fRate);
-    } else {
+    }
+    else
+    {
       RCLCPP_INFO(get_logger(), "Error getting frame rate.\n");
     }
-  } else {
+  }
+  else
+  {
     RCLCPP_INFO(get_logger(), "... not connected :( ");
     return false;
   }
@@ -332,21 +346,25 @@ bool OptitrackDriverNode::connect_optitrack() {
   return true;
 }
 
-bool OptitrackDriverNode::disconnect_optitrack() {
+bool OptitrackDriverNode::disconnect_optitrack()
+{
   void* response;
   int nBytes;
-  if (client->SendMessageAndWait("Disconnect", &response, &nBytes) ==
-      ErrorCode_OK) {
+  if (client->SendMessageAndWait("Disconnect", &response, &nBytes) == ErrorCode_OK)
+  {
     client->Disconnect();
     RCLCPP_INFO(get_logger(), "[Client] Disconnected");
     return true;
-  } else {
+  }
+  else
+  {
     RCLCPP_ERROR(get_logger(), "[Client] Disconnect not successful..");
     return false;
   }
 }
 
-void OptitrackDriverNode::initParameters() {
+void OptitrackDriverNode::initParameters()
+{
   get_parameter<std::string>("connection_type", connection_type_);
   get_parameter<std::string>("server_address", server_address_);
   get_parameter<std::string>("local_address", local_address_);
@@ -359,4 +377,4 @@ void OptitrackDriverNode::initParameters() {
   get_parameter<std::string>("rb_topic", rb_topic_);
 }
 
-} // namespace mocap4r2_optitrack_driver
+}  // namespace mocap4r2_optitrack_driver
