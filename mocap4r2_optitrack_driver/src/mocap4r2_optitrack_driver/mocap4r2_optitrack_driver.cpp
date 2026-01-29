@@ -112,10 +112,9 @@ std::chrono::nanoseconds OptitrackDriverNode::get_optitrack_latency(sFrameOfMoca
 
   if (clientLatency >= large_latency_threshold_)
   {
-    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 500,
-                         "Optitrack latency >%.1f ms: [Transmission: "
-                         "%.1fms, Total: %.1fms]",
-                         large_latency_threshold_, transitLatency * 1000.0, clientLatency * 1000.0);
+    RCLCPP_WARN_THROTTLE(get_logger(), *get_clock(), 1,
+                         "Optitrack latency > %.1f ms: [Transmission: %.1fms, Total: %.1fms]",
+                         large_latency_threshold_ * 1000.0, transitLatency * 1000.0, clientLatency * 1000.0);
   }
   else
   {
