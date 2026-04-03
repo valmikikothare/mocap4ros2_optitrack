@@ -75,19 +75,13 @@ void OptitrackDriverNode::set_settings_optitrack()
 }
 
 void OptitrackDriverNode::control_start(const mocap4r2_control_msgs::msg::Control::SharedPtr msg)
-{
-  (void)msg;
-}
+{ (void)msg; }
 
 void OptitrackDriverNode::control_stop(const mocap4r2_control_msgs::msg::Control::SharedPtr msg)
-{
-  (void)msg;
-}
+{ (void)msg; }
 
 void NATNET_CALLCONV process_frame_callback(sFrameOfMocapData* data, void* pUserData)
-{
-  static_cast<OptitrackDriverNode*>(pUserData)->process_frame(data);
-}
+{ static_cast<OptitrackDriverNode*>(pUserData)->process_frame(data); }
 
 std::chrono::nanoseconds OptitrackDriverNode::get_optitrack_latency(sFrameOfMocapData* data)
 {
@@ -145,6 +139,8 @@ void OptitrackDriverNode::process_frame(sFrameOfMocapData* data)
     msg.header_original.frame_id = frame_id_;
     msg.header.stamp = msg.header_original.stamp - frame_delay;
     msg.header.frame_id = frame_id_;
+    msg.mid_exposure_time = data->CameraMidExposureTimestamp;
+    msg.data_received_time = data->CameraDataReceivedTimestamp;
 
     msg.frame_number = frame_number_;
 
